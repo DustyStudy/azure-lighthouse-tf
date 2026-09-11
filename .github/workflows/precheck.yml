@@ -52,6 +52,13 @@ jobs:
     strategy:
       matrix:
         cloud: [public, gov]
+    # This template ships with no real Azure subscription behind it. Each
+    # team that adopts this template adds its own App Registration + OIDC
+    # federated credential and sets these repo variables; until then, this
+    # job (and everything downstream of it) skips cleanly rather than
+    # failing, so the template's code-quality checks still pass on a fresh
+    # clone. See README.md "One-time setup" for what an adopting team does.
+    if: ${{ vars[format('AZURE_CLIENT_ID_{0}', matrix.cloud)] != '' }}
     permissions:
       contents: read
       id-token: write   # required for azure/login OIDC
@@ -75,6 +82,19 @@ jobs:
         run: |
           chmod +x scripts/prechecks/validate-role-defs.sh
           ./scripts/prechecks/validate-role-defs.sh environments/${{ matrix.cloud }}/terraform.tfvars
+
+  no-azure-config:
+    name: Azure not configured (template mode)
+    runs-on: ubuntu-latest
+    needs: static-analysis
+    strategy:
+      matrix:
+        cloud: [public, gov]
+    if: ${{ vars[format('AZURE_CLIENT_ID_{0}', matrix.cloud)] == '' }}
+    steps:
+      - run: |
+          echo "::notice::No AZURE_CLIENT_ID_${{ matrix.cloud }} repo variable set - skipping Azure-dependent checks for ${{ matrix.cloud }}."
+          echo "::notice::This is expected for an unconfigured clone of the template. See README.md 'One-time setup' to wire up a real subscription."
 
   plan:
     name: terraform plan

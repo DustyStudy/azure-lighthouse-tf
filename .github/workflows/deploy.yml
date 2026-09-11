@@ -25,6 +25,11 @@ jobs:
     # per cloud, so a run against `gov-prod` can never mint a token that
     # only the `public-prod` App Registration trusts, or vice versa.
     environment: ${{ inputs.environment_name }}
+    # Template mode: skip cleanly if this clone hasn't been wired up to a
+    # real Azure subscription yet (no AZURE_CLIENT_ID_<cloud> repo variable
+    # set). See README.md "One-time setup" for what an adopting team does
+    # before this job can actually run.
+    if: ${{ vars[format('AZURE_CLIENT_ID_{0}', inputs.cloud)] != '' }}
     permissions:
       contents: read
       id-token: write
