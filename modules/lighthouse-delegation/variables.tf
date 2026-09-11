@@ -33,8 +33,3 @@ variable "authorizations" {
     error_message = "At least one authorization is required; an empty delegation grants no access and is almost certainly a mistake."
   }
 }
-
-variable "tags" {
-  type    = map(string)
-  default = {}
-}

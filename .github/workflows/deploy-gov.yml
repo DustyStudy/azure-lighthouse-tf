@@ -11,6 +11,7 @@ on:
       - "variables.tf"
       - "providers.tf"
       - "outputs.tf"
+  workflow_dispatch:
 
 permissions:
   contents: read

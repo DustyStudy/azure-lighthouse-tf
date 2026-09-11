@@ -32,9 +32,9 @@ variable "delegation_description" {
 variable "authorizations" {
   description = <<-EOT
     List of role delegations to grant the managing tenant. Each entry:
-      principal_id            = object ID of the user/group/SPN in the MANAGING tenant
-      principal_display_name  = friendly name shown in the customer's Lighthouse UI
-      role_definition_id      = built-in role definition GUID (NOT the full resource ID)
+      principal_id                  = object ID of the user/group/SPN in the MANAGING tenant
+      principal_display_name        = friendly name shown in the customer's Lighthouse UI
+      role_definition_id            = built-in role definition GUID (NOT the full resource ID)
       delegated_role_definition_ids = optional list of role GUIDs this principal
                                        may further delegate via PIM eligible assignments
     Deliberately does NOT default to any value — every deployment must state
@@ -43,15 +43,10 @@ variable "authorizations" {
     (18d7d88d-d35e-4fb5-a5c3-7773c20a72d9) unless allow-listed.
   EOT
   type = list(object({
-    principal_id                   = string
-    principal_display_name         = string
-    role_definition_id             = string
-    delegated_role_definition_ids  = optional(list(string), [])
+    principal_id                  = string
+    principal_display_name        = string
+    role_definition_id            = string
+    delegated_role_definition_ids = optional(list(string), [])
   }))
 }
 
-variable "tags" {
-  description = "Tags applied to the Lighthouse definition."
-  type        = map(string)
-  default     = {}
-}
