@@ -52,20 +52,29 @@ jobs:
     strategy:
       matrix:
         cloud: [public, gov]
-    # This template ships with no real Azure subscription behind it. Each
-    # team that adopts this template adds its own App Registration + OIDC
-    # federated credential and sets these repo variables; until then, this
-    # job (and everything downstream of it) skips cleanly rather than
-    # failing, so the template's code-quality checks still pass on a fresh
-    # clone. See README.md "One-time setup" for what an adopting team does.
-    if: ${{ vars[format('AZURE_CLIENT_ID_{0}', matrix.cloud)] != '' }}
     permissions:
       contents: read
       id-token: write   # required for azure/login OIDC
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2 - verified SHA
 
+      # NOTE: the `matrix` context is not available in a job-level `if:` -
+      # only in step-level `if:` (confirmed GitHub Actions platform
+      # behavior, not a bug). So each step below guards itself instead of
+      # gating the whole job - this is what lets an unconfigured template
+      # clone skip Azure-dependent work per-cloud without failing.
+      - name: Check Azure config for ${{ matrix.cloud }}
+        id: config
+        run: |
+          if [ -n "${{ vars[format('AZURE_CLIENT_ID_{0}', matrix.cloud)] }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No AZURE_CLIENT_ID_${{ matrix.cloud }} repo variable set - skipping Azure-dependent checks for ${{ matrix.cloud }}. Expected on an unconfigured template clone; see README.md 'Adopting this template'."
+          fi
+
       - name: Azure login (OIDC, read-only precheck)
+        if: steps.config.outputs.configured == 'true'
         uses: azure/login@v2.3.0 # TODO: Dependabot will PR the verified SHA for this
         with:
           client-id: ${{ vars[format('AZURE_CLIENT_ID_{0}', matrix.cloud)] }}
@@ -74,27 +83,16 @@ jobs:
           environment: ${{ matrix.cloud == 'gov' && 'AzureUSGovernment' || 'AzureCloud' }}
 
       - name: Validate principal IDs
+        if: steps.config.outputs.configured == 'true'
         run: |
           chmod +x scripts/prechecks/validate-principal-ids.sh
           ./scripts/prechecks/validate-principal-ids.sh environments/${{ matrix.cloud }}/terraform.tfvars
 
       - name: Validate role definitions
+        if: steps.config.outputs.configured == 'true'
         run: |
           chmod +x scripts/prechecks/validate-role-defs.sh
           ./scripts/prechecks/validate-role-defs.sh environments/${{ matrix.cloud }}/terraform.tfvars
-
-  no-azure-config:
-    name: Azure not configured (template mode)
-    runs-on: ubuntu-latest
-    needs: static-analysis
-    strategy:
-      matrix:
-        cloud: [public, gov]
-    if: ${{ vars[format('AZURE_CLIENT_ID_{0}', matrix.cloud)] == '' }}
-    steps:
-      - run: |
-          echo "::notice::No AZURE_CLIENT_ID_${{ matrix.cloud }} repo variable set - skipping Azure-dependent checks for ${{ matrix.cloud }}."
-          echo "::notice::This is expected for an unconfigured clone of the template. See README.md 'One-time setup' to wire up a real subscription."
 
   plan:
     name: terraform plan
@@ -110,11 +108,23 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2 - verified SHA
 
+      - name: Check Azure config for ${{ matrix.cloud }}
+        id: config
+        run: |
+          if [ -n "${{ vars[format('AZURE_CLIENT_ID_{0}', matrix.cloud)] }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No AZURE_CLIENT_ID_${{ matrix.cloud }} repo variable set - skipping plan for ${{ matrix.cloud }}."
+          fi
+
       - uses: hashicorp/setup-terraform@v3.1.2 # TODO: Dependabot will PR the verified SHA for this
+        if: steps.config.outputs.configured == 'true'
         with:
           terraform_version: "1.9.0"
 
       - name: Azure login (OIDC)
+        if: steps.config.outputs.configured == 'true'
         uses: azure/login@v2.3.0 # TODO: Dependabot will PR the verified SHA for this
         with:
           client-id: ${{ vars[format('AZURE_CLIENT_ID_{0}', matrix.cloud)] }}
@@ -123,12 +133,14 @@ jobs:
           environment: ${{ matrix.cloud == 'gov' && 'AzureUSGovernment' || 'AzureCloud' }}
 
       - name: terraform init
+        if: steps.config.outputs.configured == 'true'
         env:
           ARM_USE_OIDC: "true"
           ARM_USE_AZUREAD: "true"
         run: terraform init -backend-config=backend-config/${{ matrix.cloud }}.backend.hcl
 
       - name: terraform plan
+        if: steps.config.outputs.configured == 'true'
         env:
           ARM_USE_OIDC: "true"
           ARM_USE_AZUREAD: "true"
@@ -139,16 +151,17 @@ jobs:
           terraform show -json tfplan-${{ matrix.cloud }} > plan-${{ matrix.cloud }}.json
 
       - name: Check for destructive changes to existing delegations
-        if: ${{ !contains(github.event.pull_request.labels.*.name, 'lighthouse-destructive-override') }}
+        if: ${{ steps.config.outputs.configured == 'true' && !contains(github.event.pull_request.labels.*.name, 'lighthouse-destructive-override') }}
         run: |
           chmod +x scripts/prechecks/check-existing-delegation.sh
           ./scripts/prechecks/check-existing-delegation.sh plan-${{ matrix.cloud }}.json
 
       - name: Note destructive-change override in use
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'lighthouse-destructive-override') }}
+        if: ${{ steps.config.outputs.configured == 'true' && contains(github.event.pull_request.labels.*.name, 'lighthouse-destructive-override') }}
         run: echo "::warning::'lighthouse-destructive-override' label present - skipping destructive-change gate. This PR needs extra reviewer scrutiny."
 
       - uses: actions/upload-artifact@v4.6.2 # TODO: Dependabot will PR the verified SHA for this
+        if: steps.config.outputs.configured == 'true'
         with:
           name: tfplan-${{ matrix.cloud }}
           path: tfplan-${{ matrix.cloud }}
