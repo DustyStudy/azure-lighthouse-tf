@@ -21,7 +21,7 @@ variable "delegation_description" {
 
 variable "authorizations" {
   description = "List of principal/role delegations. See root variables.tf for the full contract."
-  type = list(object({
+  type        = list(object({
     principal_id                  = string
     principal_display_name        = string
     role_definition_id            = string
@@ -32,9 +32,4 @@ variable "authorizations" {
     condition     = length(var.authorizations) > 0
     error_message = "At least one authorization is required; an empty delegation grants no access and is almost certainly a mistake."
   }
-}
-
-variable "tags" {
-  type    = map(string)
-  default = {}
 }

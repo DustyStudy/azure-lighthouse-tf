@@ -13,8 +13,6 @@ resource "azurerm_lighthouse_definition" "this" {
       delegated_role_definition_ids = authorization.value.delegated_role_definition_ids
     }
   }
-
-  tags = var.tags
 }
 
 resource "azurerm_lighthouse_assignment" "this" {

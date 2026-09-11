@@ -6,5 +6,4 @@ module "lighthouse_delegation" {
   delegation_name        = var.delegation_name
   delegation_description = var.delegation_description
   authorizations         = var.authorizations
-  tags                   = var.tags
 }

@@ -50,8 +50,3 @@ variable "authorizations" {
   }))
 }
 
-variable "tags" {
-  description = "Tags applied to the Lighthouse definition."
-  type        = map(string)
-  default     = {}
-}
