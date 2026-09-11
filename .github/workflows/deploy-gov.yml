@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write   # required so the caller can grant it down to deploy.yml's apply job
 
 jobs:
   deploy:
