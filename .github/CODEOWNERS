@@ -1,0 +1,3 @@
+# Require review on every change - especially important since this repo
+# grants cross-tenant access when applied.
+* @DustyStudy

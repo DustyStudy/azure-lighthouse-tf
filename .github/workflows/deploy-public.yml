@@ -1,0 +1,24 @@
+name: Deploy - Azure Public
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "modules/**"
+      - "environments/public/**"
+      - "backend-config/public.backend.hcl"
+      - "main.tf"
+      - "variables.tf"
+      - "providers.tf"
+      - "outputs.tf"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      cloud: public
+      environment_name: public-prod
+    secrets: inherit

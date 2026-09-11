@@ -1,0 +1,130 @@
+name: Precheck
+
+on:
+  pull_request:
+    branches: [main]
+
+# Least-privilege default. Individual jobs elevate only what they need.
+permissions:
+  contents: read
+
+concurrency:
+  group: precheck-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  static-analysis:
+    name: fmt / validate / lint / security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.9.0"
+          terraform_wrapper: false
+
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive
+
+      - name: terraform init (no backend)
+        run: terraform init -backend=false
+
+      - name: terraform validate
+        run: terraform validate
+
+      - name: tflint
+        uses: terraform-linters/setup-tflint@90f302c255ef959cbfb4bd10581afecdb7ece3e6 # v4.1.1
+      - run: tflint --init && tflint -f compact
+
+      - name: tfsec
+        uses: aquasecurity/tfsec-action@6c9b64c8f3672d7e0be7cc915768bf8747f7ec73 # v1.0.3
+
+  precheck-scripts:
+    name: custom Lighthouse prechecks
+    runs-on: ubuntu-latest
+    needs: static-analysis
+    strategy:
+      matrix:
+        cloud: [public, gov]
+    permissions:
+      contents: read
+      id-token: write   # required for azure/login OIDC
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Azure login (OIDC, read-only precheck)
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844edc # v2.3.0
+        with:
+          client-id: ${{ vars[format('AZURE_CLIENT_ID_{0}', matrix.cloud)] }}
+          tenant-id: ${{ vars[format('AZURE_TENANT_ID_{0}', matrix.cloud)] }}
+          subscription-id: ${{ vars[format('AZURE_SUBSCRIPTION_ID_{0}', matrix.cloud)] }}
+          environment: ${{ matrix.cloud == 'gov' && 'AzureUSGovernment' || 'AzureCloud' }}
+
+      - name: Validate principal IDs
+        run: |
+          chmod +x scripts/prechecks/validate-principal-ids.sh
+          ./scripts/prechecks/validate-principal-ids.sh environments/${{ matrix.cloud }}/terraform.tfvars
+
+      - name: Validate role definitions
+        run: |
+          chmod +x scripts/prechecks/validate-role-defs.sh
+          ./scripts/prechecks/validate-role-defs.sh environments/${{ matrix.cloud }}/terraform.tfvars
+
+  plan:
+    name: terraform plan
+    runs-on: ubuntu-latest
+    needs: precheck-scripts
+    strategy:
+      matrix:
+        cloud: [public, gov]
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write   # to comment plan output on the PR
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Azure login (OIDC)
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844edc # v2.3.0
+        with:
+          client-id: ${{ vars[format('AZURE_CLIENT_ID_{0}', matrix.cloud)] }}
+          tenant-id: ${{ vars[format('AZURE_TENANT_ID_{0}', matrix.cloud)] }}
+          subscription-id: ${{ vars[format('AZURE_SUBSCRIPTION_ID_{0}', matrix.cloud)] }}
+          environment: ${{ matrix.cloud == 'gov' && 'AzureUSGovernment' || 'AzureCloud' }}
+
+      - name: terraform init
+        env:
+          ARM_USE_OIDC: "true"
+          ARM_USE_AZUREAD: "true"
+        run: terraform init -backend-config=backend-config/${{ matrix.cloud }}.backend.hcl
+
+      - name: terraform plan
+        env:
+          ARM_USE_OIDC: "true"
+          ARM_USE_AZUREAD: "true"
+        run: |
+          terraform plan \
+            -var-file=environments/${{ matrix.cloud }}/terraform.tfvars \
+            -out=tfplan-${{ matrix.cloud }}
+          terraform show -json tfplan-${{ matrix.cloud }} > plan-${{ matrix.cloud }}.json
+
+      - name: Check for destructive changes to existing delegations
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'lighthouse-destructive-override') }}
+        run: |
+          chmod +x scripts/prechecks/check-existing-delegation.sh
+          ./scripts/prechecks/check-existing-delegation.sh plan-${{ matrix.cloud }}.json
+
+      - name: Note destructive-change override in use
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'lighthouse-destructive-override') }}
+        run: echo "::warning::'lighthouse-destructive-override' label present - skipping destructive-change gate. This PR needs extra reviewer scrutiny."
+
+      - uses: actions/upload-artifact@6027e3dd177782cd8ab9af838c04fd81a07f1d47 # v4.6.2
+        with:
+          name: tfplan-${{ matrix.cloud }}
+          path: tfplan-${{ matrix.cloud }}
+          retention-days: 5

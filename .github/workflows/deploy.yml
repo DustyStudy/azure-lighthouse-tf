@@ -1,0 +1,77 @@
+name: Deploy (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      cloud:
+        description: "public or gov"
+        required: true
+        type: string
+      environment_name:
+        description: "GitHub Environment to run under (gates OIDC credential + required reviewers)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    name: terraform apply (${{ inputs.cloud }})
+    runs-on: ubuntu-latest
+    # The GitHub Environment is what actually enforces "require reviewers"
+    # and scopes which OIDC federated credential can be exchanged - the
+    # federated credential subject is bound to this exact environment name,
+    # per cloud, so a run against `gov-prod` can never mint a token that
+    # only the `public-prod` App Registration trusts, or vice versa.
+    environment: ${{ inputs.environment_name }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Azure login (OIDC)
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844edc # v2.3.0
+        with:
+          client-id: ${{ vars[format('AZURE_CLIENT_ID_{0}', inputs.cloud)] }}
+          tenant-id: ${{ vars[format('AZURE_TENANT_ID_{0}', inputs.cloud)] }}
+          subscription-id: ${{ vars[format('AZURE_SUBSCRIPTION_ID_{0}', inputs.cloud)] }}
+          environment: ${{ inputs.cloud == 'gov' && 'AzureUSGovernment' || 'AzureCloud' }}
+
+      - name: terraform init
+        env:
+          ARM_USE_OIDC: "true"
+          ARM_USE_AZUREAD: "true"
+        run: terraform init -backend-config=backend-config/${{ inputs.cloud }}.backend.hcl
+
+      - name: Re-run prechecks against current state (defense in depth)
+        run: |
+          chmod +x scripts/prechecks/*.sh
+          ./scripts/prechecks/validate-role-defs.sh environments/${{ inputs.cloud }}/terraform.tfvars
+
+      - name: terraform plan
+        env:
+          ARM_USE_OIDC: "true"
+          ARM_USE_AZUREAD: "true"
+        run: |
+          terraform plan \
+            -var-file=environments/${{ inputs.cloud }}/terraform.tfvars \
+            -out=tfplan
+          terraform show -json tfplan > plan.json
+
+      - name: Check for destructive changes to existing delegations
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'lighthouse-destructive-override') }}
+        run: |
+          chmod +x scripts/prechecks/check-existing-delegation.sh
+          ./scripts/prechecks/check-existing-delegation.sh plan.json
+
+      - name: terraform apply
+        env:
+          ARM_USE_OIDC: "true"
+          ARM_USE_AZUREAD: "true"
+        run: terraform apply -auto-approve tfplan
