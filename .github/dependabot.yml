@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Dependabot resolves tags to their real commit SHA directly via the
+    # GitHub API and opens a PR pinning to it - this is how the version-tag
+    # references below (used as a safe starting point) get converted to
+    # verified SHA pins without hand-guessing hashes.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
