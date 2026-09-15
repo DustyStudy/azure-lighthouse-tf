@@ -33,6 +33,9 @@ rationale.
 - **Template-safe CI** - code-quality checks (`fmt`, `validate`, `tflint`,
   `checkov`) run and enforce on every PR with zero Azure setup; the
   Azure-dependent jobs skip cleanly until a real subscription is wired up.
+- **Secret scanning** (`gitleaks`) and **automated module tests**
+  (`terraform test` against a mocked provider - no cloud credentials needed)
+  run on every PR alongside the static analysis.
 
 ## Layout
 

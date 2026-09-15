@@ -13,6 +13,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  secret-scan:
+    name: gitleaks secret scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2 - verified SHA
+        with:
+          fetch-depth: 0   # gitleaks needs full history, not just the merge commit
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v3.0.0 # TODO: Dependabot will PR the verified SHA for this
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   static-analysis:
     name: fmt / validate / lint / security scan
     runs-on: ubuntu-latest
@@ -32,6 +47,9 @@ jobs:
 
       - name: terraform validate
         run: terraform validate
+
+      - name: terraform test
+        run: terraform test
 
       - name: tflint
         uses: terraform-linters/setup-tflint@v4.1.1 # TODO: Dependabot will PR the verified SHA for this
