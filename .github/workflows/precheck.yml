@@ -3,13 +3,17 @@ name: Precheck
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]   # keeps the Precheck badge accurate after merges - the badge
+                        # shows the latest run *on main*, and pull_request-triggered
+                        # runs are associated with the PR's head branch, not main
 
 # Least-privilege default. Individual jobs elevate only what they need.
 permissions:
   contents: read
 
 concurrency:
-  group: precheck-${{ github.event.pull_request.number }}
+  group: precheck-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
