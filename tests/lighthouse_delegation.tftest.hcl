@@ -10,6 +10,7 @@
 mock_provider "azurerm" {}
 
 variables {
+  azure_environment  = "public"
   scope              = "/subscriptions/00000000-0000-0000-0000-000000000000"
   managing_tenant_id = "11111111-1111-1111-1111-111111111111"
   delegation_name    = "test-delegation"
