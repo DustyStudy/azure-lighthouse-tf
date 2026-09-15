@@ -48,5 +48,10 @@ variable "authorizations" {
     role_definition_id            = string
     delegated_role_definition_ids = optional(list(string), [])
   }))
+
+  validation {
+    condition     = length(var.authorizations) > 0
+    error_message = "At least one authorization is required; an empty delegation grants no access and is almost certainly a mistake."
+  }
 }
 

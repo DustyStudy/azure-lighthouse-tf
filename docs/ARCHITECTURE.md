@@ -8,6 +8,29 @@ or sever a trust relationship with no interaction from the customer side.
 Every design choice here optimizes for **making that change visible and
 reversible before it happens**, not just for DRY Terraform.
 
+## Pipeline flow
+
+```mermaid
+flowchart TD
+    PR[Pull Request] --> SS[secret-scan: gitleaks]
+    PR --> SA[static-analysis: fmt / validate / tflint / checkov]
+    SA --> PS["precheck-scripts (per cloud)\nprincipal ID + role validation"]
+    PS --> PL["plan (per cloud)\nterraform plan + destructive-change gate"]
+    PL --> Merge{Merge to main}
+    Merge --> DP[deploy-public.yml]
+    Merge --> DG[deploy-gov.yml]
+    DP --> EnvP{{public-prod environment\nrequired reviewers}}
+    DG --> EnvG{{gov-prod environment\nrequired reviewers}}
+    EnvP --> AP[terraform apply - Azure Public]
+    EnvG --> AG[terraform apply - Azure Government]
+```
+
+Every Azure-touching step in this pipeline authenticates via a **different**
+OIDC federated credential scoped to its own subject (`pull_request` for the
+read-only precheck, `environment:public-prod` / `environment:gov-prod` for
+the actual applies) - so no single leaked token grants both read and write,
+or access to both clouds.
+
 ## Dual-cloud model
 
 Azure Public and Azure Government are separate clouds with separate AAD

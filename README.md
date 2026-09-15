@@ -1,15 +1,41 @@
 # azure-lighthouse-tf
 
-**This is a template repo**, not a live deployment. It provides Terraform
-automation for Azure Lighthouse delegated resource management, deployable to
-both **Azure Public** and **Azure Government**, with GitHub Actions CI/CD and
-pre-deployment validation designed for a control that grants cross-tenant
-access. Fork or use as a template, then follow "Adopting this template"
-below to point it at your own subscription(s) - nobody needs to authenticate
-to Azure to just read, fork, or review this repo.
+[![Precheck](https://github.com/DustyStudy/azure-lighthouse-tf/actions/workflows/precheck.yml/badge.svg)](https://github.com/DustyStudy/azure-lighthouse-tf/actions/workflows/precheck.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+Terraform automation for [Azure Lighthouse](https://learn.microsoft.com/en-us/azure/lighthouse/) delegated resource management, deployable to
+both **Azure Public** and **Azure Government** from a single codebase, with
+GitHub Actions CI/CD and pre-deployment validation built for a control that
+grants cross-tenant access.
+
+**This is a template repo**, not a live deployment - fork or use as a
+template, then follow "Adopting this template" below to point it at a real
+subscription. Nobody needs to authenticate to Azure to read, fork, or review
+it; see [`SECURITY.md`](SECURITY.md) for the security model this repo
+follows.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design
 rationale.
+
+## Highlights
+
+- **Keyless auth** - OIDC federated credentials only; no client secrets or
+  long-lived keys anywhere in the pipeline.
+- **Dual-cloud from one codebase** - the same Terraform module deploys to
+  Azure Public and Azure Government via separate tfvars, backends, and OIDC
+  credentials, never sharing state or trust between the two.
+- **SHA-pinned Actions**, kept current via Dependabot rather than hand-edited
+  hashes, to close the exact class of supply-chain attack a mutable tag
+  reference is vulnerable to.
+- **Custom policy gates** beyond generic linting: reject unreviewed
+  high-privilege role delegations, and block any plan that would silently
+  delete or replace an existing cross-tenant access grant.
+- **Template-safe CI** - code-quality checks (`fmt`, `validate`, `tflint`,
+  `checkov`) run and enforce on every PR with zero Azure setup; the
+  Azure-dependent jobs skip cleanly until a real subscription is wired up.
+- **Secret scanning** (`gitleaks`) and **automated module tests**
+  (`terraform test` against a mocked provider - no cloud credentials needed)
+  run on every PR alongside the static analysis.
 
 ## Layout
 

@@ -1,0 +1,18 @@
+# Normalize to LF in the repository regardless of the checkout OS.
+# This is what stops the "LF will be replaced by CRLF" warning on every
+# Windows commit - git still checks files out with native line endings
+# locally, but stores and diffs them consistently as LF.
+* text=auto eol=lf
+
+*.tf   text eol=lf
+*.tfvars text eol=lf
+*.hcl  text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.sh   text eol=lf
+*.md   text eol=lf
+
+# Binary-ish or generated content some tools may add later - never touch line endings
+*.zip  -text
+*.png  -text
+*.jpg  -text
