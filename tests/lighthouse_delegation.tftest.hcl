@@ -20,11 +20,7 @@ run "valid_authorization_plans_successfully" {
 
   variables {
     authorizations = [
-      {
-        principal_id            = "22222222-2222-2222-2222-222222222222"
-        principal_display_name  = "Test Reader"
-        role_definition_id      = "acdd72a7-3385-48ef-bd42-f606fba81ae7" # Reader
-      }
+      { principal_id = "22222222-2222-2222-2222-222222222222", principal_display_name = "Test Reader", role_definition_id = "acdd72a7-3385-48ef-bd42-f606fba81ae7" }
     ]
   }
 
