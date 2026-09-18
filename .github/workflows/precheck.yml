@@ -61,7 +61,7 @@ jobs:
       - run: tflint --init && tflint -f compact
 
       - name: checkov (Terraform static security scan)
-        uses: bridgecrewio/checkov-action@f967808197a8d784d3e72919f38c3ff0cda7884e # v12.1347.0 - verified SHA
+        uses: bridgecrewio/checkov-action@a8664e3a0549367977f0cda990a34311835c87c0 # v12.1347.0 - verified SHA
         with:
           directory: .
           framework: terraform
@@ -104,7 +104,7 @@ jobs:
 
       - name: Azure login (OIDC, read-only precheck)
         if: steps.config.outputs.configured == 'true'
-        uses: azure/login@v3.0.2 # TODO: Dependabot will PR the verified SHA for this
+        uses: azure/login@v3.1.0 # TODO: Dependabot will PR the verified SHA for this
         with:
           client-id: ${{ vars[format('AZURE_CLIENT_ID_{0}', matrix.cloud)] }}
           tenant-id: ${{ vars[format('AZURE_TENANT_ID_{0}', matrix.cloud)] }}
@@ -155,7 +155,7 @@ jobs:
 
       - name: Azure login (OIDC)
         if: steps.config.outputs.configured == 'true'
-        uses: azure/login@v3.0.2 # TODO: Dependabot will PR the verified SHA for this
+        uses: azure/login@v3.1.0 # TODO: Dependabot will PR the verified SHA for this
         with:
           client-id: ${{ vars[format('AZURE_CLIENT_ID_{0}', matrix.cloud)] }}
           tenant-id: ${{ vars[format('AZURE_TENANT_ID_{0}', matrix.cloud)] }}
