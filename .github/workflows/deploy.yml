@@ -58,7 +58,7 @@ jobs:
 
       - name: Azure login (OIDC)
         if: steps.config.outputs.configured == 'true'
-        uses: azure/login@v3.0.2 # TODO: Dependabot will PR the verified SHA for this
+        uses: azure/login@v3.1.0 # TODO: Dependabot will PR the verified SHA for this
         with:
           client-id: ${{ vars[format('AZURE_CLIENT_ID_{0}', inputs.cloud)] }}
           tenant-id: ${{ vars[format('AZURE_TENANT_ID_{0}', inputs.cloud)] }}
